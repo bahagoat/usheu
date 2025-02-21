@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Быстрый диктор ойыны</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f3f4f6; text-align: center; }
+        header { background: #2563eb; color: white; padding: 15px; font-size: 24px; }
+        .container { max-width: 800px; margin: 20px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .text-box { font-size: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; background: #e5e7eb; min-height: 80px; max-height: 120px; overflow-y: auto; }
+        .controls { margin-top: 20px; }
+        select, button { padding: 10px; font-size: 16px; margin: 5px; }
+        .record-btn, .start-text-btn { background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .stop-btn { background: red; color: white; border: none; border-radius: 5px; cursor: pointer; display: none; }
+        .delete-btn { background: #ff3b3b; color: white; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px; }
+        .audio-container, .saved-audios { margin-top: 20px; }
+        .tab-container { display: flex; justify-content: center; margin-top: 20px; }
+        .tab { padding: 10px; cursor: pointer; border: 1px solid #2563eb; background: white; }
+        .tab.active { background: #2563eb; color: white; }
+        .content { display: none; }
+        .content.active { display: block; }
+    </style>
+</head>
+<body>
+    <header>🎙 Быстрый диктор ойыны</header>
+    <div class="container">
+        <div class="tab-container">
+            <div class="tab active" onclick="switchTab('game')">Ойын</div>
+            <div class="tab" onclick="switchTab('saved')">Сақталған жазбалар</div>
+        </div>
+        
+        <div id="game" class="content active">
+            <div class="controls">
+                <label for="text-select">Текст таңдау:</label>
+                <select id="text-select"></select>
+                <label for="speed">Жылдамдық деңгейі:</label>
+                <select id="speed">
+                    <option value="4000">1 - Өте баяу</option>
+                    <option value="3000">2 - Баяу</option>
+                    <option value="2000" selected>3 - Орташа</option>
+                    <option value="1000">4 - Жылдам</option>
+                    <option value="500">5 - Өте жылдам</option>
+                </select>
+            </div>
+            <button class="start-text-btn" id="start-text-btn">📜 Текстті бастау</button>
+            <button class="record-btn" id="record-btn">🎤 Жазуды бастау</button>
+            <button class="stop-btn" id="stop-btn">⏹ Тоқтату</button>
+            <div class="text-box" id="text-box"></div>
+            <div class="audio-container" id="audio-container"></div>
+        </div>
+        
+        <div id="saved" class="content">
+            <h2>Сақталған жазбалар</h2>
+            <div class="saved-audios" id="saved-audios"></div>
+        </div>
+    </div>
+    <script>
+        let texts = [
+            "Бұл 1-мәтін дикцияны дамытуға көмектеседі.",
+            "Бұл 2-мәтін сөйлеу мәнеріңізді жақсартуға арналған.",
+            "Бұл 3-мәтін сіздің жылдам оқуыңызды жетілдіреді.",
+            "Бұл 4-мәтін артикуляцияңызды жақсарту үшін берілген.",
+            "Бұл 5-мәтін сіздің дикцияңызға пайдалы."
+        ];
+        let textSelect = document.getElementById("text-select");
+        let textBox = document.getElementById("text-box");
+        let savedAudios = document.getElementById("saved-audios");
+        let mediaRecorder;
+        let audioChunks = [];
+        let textInterval;
+        
+        texts.forEach((text, index) => {
+            let option = document.createElement("option");
+            option.value = index;
+            option.innerText = `Текст ${index + 1}`;
+            textSelect.appendChild(option);
+        });
+        
+        document.getElementById("start-text-btn").addEventListener("click", () => {
+            let words = texts[textSelect.value].split(" ");
+            textBox.innerText = "";
+            let index = 0;
+            let speed = document.getElementById("speed").value;
+            textInterval = setInterval(() => {
+                if (index < words.length) {
+                    textBox.innerText += words[index] + " ";
+                    index++;
+                } else {
+                    clearInterval(textInterval);
+                }
+            }, speed);
+        });
+        
+        document.getElementById("record-btn").addEventListener("click", async () => {
+            let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start();
+            audioChunks = [];
+            mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+            mediaRecorder.onstop = () => {
+                let audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                let audioUrl = URL.createObjectURL(audioBlob);
+                let audioElement = document.createElement("audio");
+                audioElement.controls = true;
+                audioElement.src = audioUrl;
+                let deleteButton = document.createElement("button");
+                deleteButton.innerText = "❌ Өшіру";
+                deleteButton.classList.add("delete-btn");
+                deleteButton.addEventListener("click", () => deleteButton.parentElement.remove());
+                let container = document.createElement("div");
+                container.appendChild(audioElement);
+                container.appendChild(deleteButton);
+                savedAudios.appendChild(container);
+            };
+            document.getElementById("stop-btn").style.display = "inline-block";
+        });
+        
+        document.getElementById("stop-btn").addEventListener("click", () => {
+            mediaRecorder.stop();
+            document.getElementById("stop-btn").style.display = "none";
+        });
+        
+        function switchTab(tabId) {
+            document.querySelectorAll(".content").forEach(tab => tab.classList.remove("active"));
+            document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
+            document.getElementById(tabId).classList.add("active");
+        }
+    </script>
+</body>
+</html>
